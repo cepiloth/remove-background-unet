@@ -29,7 +29,7 @@ transform = albu.Compose([
     albu.Normalize()
 ])
 
-st.title('Remove Background AI')
+st.title('인물 사진에서 배경 제거하는 AI')
 
 file = st.file_uploader('사람 사진을 선택해주세요', type=['jpg', 'jpeg', 'png', 'gif'])
 
