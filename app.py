@@ -29,32 +29,37 @@ transform = albu.Compose([
     albu.Normalize()
 ])
 
-st.title('인물 사진에서 배경 제거하는 AI')
+col1, col2 = st.columns(2)
 
-file = st.file_uploader('사람 사진을 선택해주세요', type=['jpg', 'jpeg', 'png', 'gif'])
+with st.container():
+    st.title('인물 사진에서 배경 제거하는 AI')
+    file = st.file_uploader('사람 사진을 선택해주세요', type=['jpg', 'jpeg', 'png', 'gif'])
+    
+with col1:
+    if file is not None:
+        img_ori = np.array(Image.open(file).convert('RGB'))
+        st.image(img_ori, caption='원본')
 
-if file is not None:
-    img_ori = np.array(Image.open(file).convert('RGB'))
-    st.image(img_ori, caption='Original')
+        img_input = transform(image=img_ori)['image']
+        img_input, pads = pad(img_input, factor=MAX_SIZE, border=cv2.BORDER_CONSTANT)
+        img_input = torch.unsqueeze(tensor_from_rgb_image(img_input), 0)
 
-    img_input = transform(image=img_ori)['image']
-    img_input, pads = pad(img_input, factor=MAX_SIZE, border=cv2.BORDER_CONSTANT)
-    img_input = torch.unsqueeze(tensor_from_rgb_image(img_input), 0)
+        with torch.no_grad():
+            pred = model(img_input)[0][0]
 
-    with torch.no_grad():
-        pred = model(img_input)[0][0]
+        mask = (pred > 0).cpu().numpy().astype(np.uint8)
+        mask = unpad(mask, pads)
 
-    mask = (pred > 0).cpu().numpy().astype(np.uint8)
-    mask = unpad(mask, pads)
+        h, w, _ = img_ori.shape
+        mask_1 = cv2.resize(mask, (w, h))
+        mask_3 = cv2.cvtColor(mask_1, cv2.COLOR_GRAY2RGB)
 
-    h, w, _ = img_ori.shape
-    mask_1 = cv2.resize(mask, (w, h))
-    mask_3 = cv2.cvtColor(mask_1, cv2.COLOR_GRAY2RGB)
+        dst = cv2.addWeighted(img_ori, 1, (mask_3 * (0, 255, 0)).astype(np.uint8), 0.5, 0)
 
-    dst = cv2.addWeighted(img_ori, 1, (mask_3 * (0, 255, 0)).astype(np.uint8), 0.5, 0)
+        result = np.dstack((img_ori, mask_1 * 255))
 
-    result = np.dstack((img_ori, mask_1 * 255))
+        #st.image(mask_1 * 255, caption='Mask')
+        #st.image(dst, caption='Image + mask')
+        with col2:
+            st.image(result, caption='결과')
 
-    #st.image(mask_1 * 255, caption='Mask')
-    #st.image(dst, caption='Image + mask')
-    st.image(result, caption='Result')
